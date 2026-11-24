@@ -7,7 +7,7 @@ import RsHomeRails from '@/components/RsHomeRails';
 import DkHomeRails from '@/components/DkHomeRails';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 export default async function HomePage() {
   const home = await getHome().catch(() => ({ genres: [] as any[], sections: [] as any[] }));

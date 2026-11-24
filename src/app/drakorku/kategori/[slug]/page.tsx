@@ -5,14 +5,10 @@ import { dkCategoryCards, DK_CATEGORIES, slugify } from '@/lib/drakorku';
 import DkCard from '@/components/DkCard';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 1800;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 interface Props {
   params: { slug: string };
-}
-
-export function generateStaticParams() {
-  return DK_CATEGORIES.map((c) => ({ slug: slugify(c) }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

@@ -3,7 +3,7 @@ import { getNewSeries, type MediaCard } from '@/lib/melolo';
 import MediaCardEl from '@/components/MediaCard';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 1800;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 export const metadata: Metadata = {
   title: 'Baru Tayang — Rilisan Terbaru 2026 | DramaKu',

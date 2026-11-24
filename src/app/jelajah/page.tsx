@@ -13,7 +13,7 @@ import DkSection from '@/components/DkSection';
 import DbSection from '@/components/DbSection';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 1800;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 export const metadata: Metadata = {
   title: 'Jelajah — Kategori, Karakter & Baru Tayang | DramaKu',

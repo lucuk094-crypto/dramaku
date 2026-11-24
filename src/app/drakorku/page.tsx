@@ -5,7 +5,7 @@ import CarouselRow from '@/components/CarouselRow';
 import DkCard from '@/components/DkCard';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 1800;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 export const metadata: Metadata = {
   title: 'Drakor & Drama Asia — Katalog Lengkap | DramaKu',

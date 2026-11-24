@@ -5,7 +5,7 @@ import { DK_CATEGORIES, slugify as dkSlug } from '@/lib/drakorku';
 import { PageHeader } from '@/components/MediaRow';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 3600;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 /** genre yang hanya berisi novel (tanpa video) tidak ditampilkan */
 const HIDDEN_GENRES = new Set(['dokter']);

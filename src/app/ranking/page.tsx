@@ -2,7 +2,7 @@ import { getRanking } from '@/lib/melolo';
 import { MediaGrid, PageHeader } from '@/components/MediaRow';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 600;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 export default async function RankingPage() {
   const sections = await getRanking().catch(() => []);

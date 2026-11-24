@@ -4,7 +4,7 @@ import { dkSeriesCards, dkCategoryCards, slugify } from '@/lib/drakorku';
 import DkCard from '@/components/DkCard';
 import Reveal from '@/components/Reveal';
 
-export const revalidate = 600;
+export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 interface Props {
   searchParams: { q?: string };
