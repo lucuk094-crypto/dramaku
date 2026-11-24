@@ -71,44 +71,46 @@ export default async function WatchPage({ params }: { params: { slug: string; ep
   }
 
   return (
-    <div className="container-x pb-16 pt-6">
-      <div className="mx-auto max-w-5xl">
-        {/* feed episode geser ala TikTok/melolo — penomoran LENGKAP 1..N */}
-        <EpisodeFeed
-          seriesSlug={series.series_slug}
-          title={series.title}
-          cover={series.cover}
-          episodeCount={series.episode_count}
-          availableCount={series.availableCount}
-          startEp={ep}
-        />
+    <>
+      {/* pemutar full-screen ala TikTok/melolo — penomoran LENGKAP 1..N */}
+      <EpisodeFeed
+        seriesSlug={series.series_slug}
+        title={series.title}
+        cover={series.cover}
+        episodeCount={series.episode_count}
+        availableCount={series.availableCount}
+        startEp={ep}
+      />
 
-        {/* judul & navigasi cepat — selalu sinkron dengan episode yang diputar */}
-        <WatchMetaBar
-          slug={series.series_slug}
-          title={series.title}
-          initialEp={ep}
-          availableCount={series.availableCount}
-          episodeCount={series.episode_count}
-          rating={series.rating}
-          shortDescription={series.short_description}
-        />
+      {/* judul & navigasi cepat — tampil di desktop; di mobile lewat tombol Detail */}
+      <div className="container-x hidden pb-16 pt-6 md:block">
+        <div className="mx-auto max-w-5xl">
+          <WatchMetaBar
+            slug={series.series_slug}
+            title={series.title}
+            initialEp={ep}
+            availableCount={series.availableCount}
+            episodeCount={series.episode_count}
+            rating={series.rating}
+            shortDescription={series.short_description}
+          />
 
-        {/* episode lain */}
-        <Reveal className="mt-14">
-          <div className="head">
-            <p className="eyebrow">Navigasi</p>
-            <h2>Episode Lainnya</h2>
-          </div>
-          <EpisodeGrid slug={series.series_slug} episodes={series.episodes} />
-        </Reveal>
+          {/* episode lain */}
+          <Reveal className="mt-14">
+            <div className="head">
+              <p className="eyebrow">Navigasi</p>
+              <h2>Episode Lainnya</h2>
+            </div>
+            <EpisodeGrid slug={series.series_slug} episodes={series.episodes} />
+          </Reveal>
 
-        {series.recommendations.length > 0 && (
-          <div className="mt-16">
-            <MediaRow title="Tonton Juga" items={series.recommendations} wide eyebrow="Rekomendasi" />
-          </div>
-        )}
+          {series.recommendations.length > 0 && (
+            <div className="mt-16">
+              <MediaRow title="Tonton Juga" items={series.recommendations} wide eyebrow="Rekomendasi" />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

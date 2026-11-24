@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import BackButton from '@/components/BackButton';
 import DbPlayer from '@/components/DbPlayer';
+import { IconChevronLeft, IconPlay } from '@/components/Icons';
 import { resolveDbEpisode, resolveDbSources, dbDetail } from '@/lib/dramabox';
 
 export const revalidate = 1800;
@@ -40,17 +41,29 @@ export default async function DramaboxWatchPage({ params, searchParams }: Props)
         : 'Streaming penuh — semua terbuka, tanpa premium.';
 
   return (
-    <div className="container-x pb-16 pt-4">
-      <div className="flex items-center justify-between gap-3">
-        <BackButton />
-        <p className="font-mono text-[11px] uppercase tracking-mono text-soft">
-          Episode {ep} dari {total}
-        </p>
-      </div>
+    <>
+      {/* pemutar full-screen ala melolo/TikTok */}
+      <section className="fixed inset-0 z-[70] flex flex-col overflow-hidden bg-[rgb(var(--bg))] md:static md:z-auto md:mx-auto md:mt-8 md:h-[84dvh] md:max-w-5xl">
+        {/* bilah melayang atas */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 bg-gradient-to-b from-black/75 via-black/25 to-transparent px-3 pb-12 pt-[calc(env(safe-area-inset-top,0px)+0.65rem)] md:px-4">
+          <span className="pointer-events-auto">
+            <BackButton />
+          </span>
+          <p className="rounded-full border border-white/15 bg-black/45 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/85 backdrop-blur-md">
+            EP {String(ep).padStart(2, '0')} / {String(total).padStart(2, '0')}
+          </p>
+          <Link
+            href={`/dramabox/judul/${b.bookId}`}
+            className="focus-ring pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md transition hover:bg-black/70"
+          >
+            <IconPlay className="h-3 w-3" /> Detail
+          </Link>
+        </div>
 
-      <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <div>
+        {/* panggung video */}
+        <div className="relative flex-1">
           <DbPlayer
+            fill
             kind={plan.kind}
             url={plan.url}
             videoId={plan.videoId}
@@ -59,9 +72,36 @@ export default async function DramaboxWatchPage({ params, searchParams }: Props)
             slug={slug}
             episode={ep}
             episodeCount={total}
-            note={noteText}
           />
+        </div>
 
+        {/* kendali episode + catatan sumber melayang */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex items-end justify-between gap-3 bg-gradient-to-t from-black/80 via-black/30 to-transparent px-3 pb-[calc(env(safe-area-inset-bottom,0px)+0.75rem)] pt-12 md:px-4">
+          <p className="max-w-[58%] text-[11px] leading-snug text-white/85">{noteText}</p>
+          <div className="pointer-events-auto flex flex-col items-end gap-2">
+            {ep > 1 && (
+              <Link
+                href={`/dramabox/tonton/${b.bookId}?ep=${ep - 1}`}
+                className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md transition hover:bg-black/70"
+              >
+                <IconChevronLeft className="h-3.5 w-3.5 rotate-90" /> Ep {ep - 1}
+              </Link>
+            )}
+            {ep < total && (
+              <Link
+                href={`/dramabox/tonton/${b.bookId}?ep=${ep + 1}`}
+                className="focus-ring inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md transition hover:bg-black/70"
+              >
+                <IconChevronLeft className="h-3.5 w-3.5 -rotate-90" /> Ep {ep + 1}
+              </Link>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* judul & daftar episode — tampil di desktop; di mobile lewat tombol Detail */}
+      <div className="container-x hidden pb-16 pt-6 md:block">
+        <div className="mx-auto max-w-5xl">
           <div className="mt-4">
             <p className="eyebrow">Sedang Ditonton</p>
             <h1 className="mt-1 text-2xl font-medium leading-tight tracking-tightest">
@@ -86,25 +126,25 @@ export default async function DramaboxWatchPage({ params, searchParams }: Props)
               Detail Judul
             </Link>
           </div>
-        </div>
 
-        {/* daftar episode — mengalir supaya pemutar tidak terblokir */}
-        <Suspense
-          fallback={
-            <aside aria-hidden>
-              <p className="eyebrow">Daftar Episode</p>
-              <div className="mt-3 grid grid-cols-5 gap-2 opacity-40 lg:grid-cols-6">
-                {Array.from({ length: 12 }).map((_, i) => (
-                  <div key={i} className="aspect-square animate-pulse rounded border border-[--border] bg-[--panel]/50" />
-                ))}
-              </div>
-            </aside>
-          }
-        >
-          <DbEpisodeAside bookId={b.bookId} ep={ep} />
-        </Suspense>
+          {/* daftar episode — mengalir supaya pemutar tidak terblokir */}
+          <Suspense
+            fallback={
+              <aside aria-hidden className="mt-10">
+                <p className="eyebrow">Daftar Episode</p>
+                <div className="mt-3 grid grid-cols-5 gap-2 opacity-40 lg:grid-cols-6">
+                  {Array.from({ length: 12 }).map((_, i) => (
+                    <div key={i} className="aspect-square animate-pulse rounded border border-[--border] bg-[--panel]/50" />
+                  ))}
+                </div>
+              </aside>
+            }
+          >
+            <DbEpisodeAside bookId={b.bookId} ep={ep} />
+          </Suspense>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 

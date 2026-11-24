@@ -25,12 +25,14 @@ interface Props {
   cover: string | null;
   /** Untuk mode feed geser: hanya slide aktif yang diputar. */
   isActive?: boolean;
+  /** Isi penuh induk (mode potret full-screen) — tanpa kotak 16:9. */
+  fill?: boolean;
 }
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const HIDE_MS = 2800;
 
-export default function Player({ seriesSlug, episode, episodeCount, title, cover, isActive = true }: Props) {
+export default function Player({ seriesSlug, episode, episodeCount, title, cover, isActive = true, fill = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,7 +81,16 @@ export default function Player({ seriesSlug, episode, episodeCount, title, cover
         video.currentTime = resumeAt;
         setResumeAt(null);
       }
-      video.play().catch(() => {});
+      video.play().catch(() => {
+        /* autoplay diblokir browser → bisukan lalu coba lagi (ala TikTok) */
+        try {
+          video.muted = true;
+          setMuted(true);
+        } catch {
+          /* noop */
+        }
+        video.play().catch(() => {});
+      });
     } else {
       video.pause();
     }
@@ -333,7 +344,11 @@ export default function Player({ seriesSlug, episode, episodeCount, title, cover
   return (
     <div
       ref={containerRef}
-      className="relative aspect-video w-full select-none overflow-hidden rounded-md border border-border/[var(--border-alpha)] bg-black"
+      className={
+        fill
+          ? 'relative h-full w-full select-none overflow-hidden bg-black'
+          : 'relative aspect-video w-full select-none overflow-hidden rounded-md border border-border/[var(--border-alpha)] bg-black'
+      }
       onMouseMove={pokeControls}
       onMouseLeave={() => playing && setControlsVisible(false)}
     >
@@ -344,7 +359,7 @@ export default function Player({ seriesSlug, episode, episodeCount, title, cover
         playsInline
         preload="metadata"
         onClick={togglePlay}
-        className="h-full w-full bg-black"
+        className="h-full w-full bg-black object-contain"
       />
 
       {/* zona double-tap */}

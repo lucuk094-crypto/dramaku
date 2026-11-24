@@ -17,14 +17,28 @@ interface Props {
 }
 
 /**
- * Feed episode vertikal ala TikTok/melolo: geser (scroll) untuk pindah episode.
- * URL ikut terupdate tanpa reload; hanya episode di sekitar slide aktif yang
- * dimount agar ringan, dan video non-aktif dijeda otomatis.
+ * Pemutar episode full-screen ala TikTok/melolo:
+ * - layar penuh mode potret (video memenuhi viewport, hitam di sekitarnya);
+ * - geser/scroll = snap antar episode;
+ * - UI melayang (kembali, EP xx/NN, detail, geser);
+ * - video selalu serasi dengan nomor episode yang aktif.
+ * Desktop: kolom snap besar di tengah halaman.
  */
 export default function EpisodeFeed({ seriesSlug, title, cover, episodeCount, availableCount, startEp }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(startEp);
   const [visited, setVisited] = useState<Set<number>>(() => new Set([startEp]));
+
+  /* kunci scroll latar saat layar-penuh (mobile) */
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    if (!mq.matches) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
 
   /* sinkron saat pindah episode lewat tautan — state tidak ikut reset
      saat server re-render dengan ?/episode baru */
@@ -44,49 +58,46 @@ export default function EpisodeFeed({ seriesSlug, title, cover, episodeCount, av
     }
   }, [startEp]);
 
-  /* gulir langsung ke episode awal (sekali saat mount, TANPA animasi agar
-     tidak ada slide lain yang sempat terlihat → video lain ikut termount) */
+  /* gulir langsung ke episode awal (retry beberapa frame — layout bisa
+     terlambat stabil, dan snap-mandatory perlu posisi yang mantap) */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const target = el.querySelector(`[data-ep="${startEp}"]`) as HTMLElement | null;
-    if (target) {
-      const prev = el.style.scrollBehavior;
-      el.style.scrollBehavior = 'auto';
-      el.scrollTop = target.offsetTop;
-      requestAnimationFrame(() => {
+    let tries = 0;
+    let raf = 0;
+    const jump = () => {
+      const target = el.querySelector(`[data-ep="${startEp}"]`) as HTMLElement | null;
+      if (target) {
+        const prev = el.style.scrollBehavior;
+        el.style.scrollBehavior = 'auto';
+        const top = target.offsetTop;
+        if (Math.abs(el.scrollTop - top) > 2) el.scrollTop = top;
         el.style.scrollBehavior = prev;
-      });
-    }
+      }
+      if (++tries < 15) raf = requestAnimationFrame(jump);
+    };
+    raf = requestAnimationFrame(jump);
+    return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* pantau slide yang terlihat >55% → jadikan episode aktif.
-     Abaikan callback pertama dari IntersectionObserver (masih menunjuk
-     posisi awal) supaya nomor episode & video yang diputar selalu serasi. */
+  /* pantau slide aktif dari posisi scroll (deterministik untuk snap container) */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let ready = false;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (!ready) return;
-        for (const entry of entries) {
-          if (entry.isIntersecting && entry.intersectionRatio >= 0.55) {
-            const ep = Number((entry.target as HTMLElement).dataset.ep);
-            if (ep >= 1 && ep <= episodeCount) setActive(ep);
-          }
-        }
-      },
-      { root: el, threshold: [0.55] },
-    );
-    el.querySelectorAll('[data-ep]').forEach((node) => io.observe(node));
-    const raf = requestAnimationFrame(() => {
-      ready = true;
-    });
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const h = el.clientHeight || 1;
+        const idx = Math.min(episodeCount, Math.max(1, Math.round(el.scrollTop / h) + 1));
+        setActive((cur) => (cur === idx ? cur : idx));
+      });
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       cancelAnimationFrame(raf);
-      io.disconnect();
+      el.removeEventListener('scroll', onScroll);
     };
   }, [episodeCount]);
 
@@ -112,6 +123,22 @@ export default function EpisodeFeed({ seriesSlug, title, cover, episodeCount, av
     window.dispatchEvent(new CustomEvent('dramaku:episode', { detail: { slug: seriesSlug, episode: active } }));
   }, [active, seriesSlug]);
 
+  /* autoplay mulus ala TikTok: coba putar; bila diblokir browser → bisukan lalu putar */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const slide = el.querySelector(`[data-ep="${active}"] video`) as HTMLVideoElement | null;
+    if (!slide) return;
+    slide.play().catch(() => {
+      try {
+        slide.muted = true;
+      } catch {
+        /* noop */
+      }
+      slide.play().catch(() => {});
+    });
+  }, [active, visited]);
+
   const goTo = (ep: number) => {
     const el = scrollRef.current;
     const target = el?.querySelector(`[data-ep="${ep}"]`) as HTMLElement | null;
@@ -121,61 +148,63 @@ export default function EpisodeFeed({ seriesSlug, title, cover, episodeCount, av
   const episodes = Array.from({ length: episodeCount }, (_, i) => i + 1);
 
   return (
-    <section aria-label="Feed episode" className="mb-10">
-      {/* readout instrumen */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <p className="eyebrow">
-          Mode geser — Episode {String(active).padStart(2, '0')} / {String(episodeCount).padStart(2, '0')}
+    <section
+      aria-label="Pemutar episode"
+      className="fixed inset-0 z-[70] flex flex-col overflow-hidden bg-[rgb(var(--bg))] md:static md:z-auto md:mx-auto md:mt-8 md:h-[84dvh] md:max-w-5xl md:rounded-lg"
+    >
+      {/* bilah melayang atas */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 bg-gradient-to-b from-black/75 via-black/25 to-transparent px-3 pb-12 pt-[calc(env(safe-area-inset-top,0px)+0.65rem)] md:px-4">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) window.history.back();
+            else window.location.href = `/series/${seriesSlug}`;
+          }}
+          className="focus-ring pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md transition hover:bg-black/70"
+        >
+          <IconChevronLeft className="h-3.5 w-3.5" /> Kembali
+        </button>
+        <p className="rounded-full border border-white/15 bg-black/45 px-3.5 py-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-white/85 backdrop-blur-md">
+          EP {String(active).padStart(2, '0')} / {String(episodeCount).padStart(2, '0')} · geser ↑↓
         </p>
-        <p className="mono text-soft">
-          Geser ke atas <IconChevronLeft className="inline h-3.5 w-3.5 rotate-90 align-[-2px]" /> untuk episode
-          berikutnya
-        </p>
+        <Link
+          href={`/series/${seriesSlug}`}
+          className="focus-ring pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-3.5 py-1.5 text-xs font-medium text-white/90 backdrop-blur-md transition hover:bg-black/70"
+        >
+          <IconPlay className="h-3 w-3" /> Detail
+        </Link>
       </div>
 
+      {/* feed snap per episode */}
       <div
         ref={scrollRef}
-        className="panel relative h-[68dvh] min-h-[360px] overflow-y-auto overscroll-contain scroll-smooth snap-y snap-mandatory"
-        style={{ scrollbarWidth: 'thin' }}
+        className="relative flex-1 snap-y snap-mandatory overflow-y-auto overscroll-contain"
+        style={{ scrollbarWidth: 'none' }}
       >
         {episodes.map((ep) => {
           const mounted = visited.has(ep);
           return (
-            <div
-              key={ep}
-              data-ep={ep}
-              className="flex h-full w-full snap-start flex-col items-center justify-center gap-3 px-3 py-3"
-            >
-              <div className="flex w-full max-w-4xl items-center justify-between gap-3">
-                <p className="mono text-soft">
-                  EP <b className="mono-accent font-normal">{String(ep).padStart(2, '0')}</b>
-                  {title ? ` — ${title}` : ''}
-                </p>
-                <p className="mono text-soft">{ep < episodeCount ? '↑ berikutnya' : '↑ akhir'}</p>
-              </div>
-
-              <div className="w-full max-w-4xl">
-                {ep > availableCount ? (
-                  /* episode belum tersedia di sumber — placeholder jelas, bukan error */
-                  <div className="panel flex aspect-video w-full flex-col items-center justify-center gap-4 px-6 text-center">
-                    <p className="eyebrow">Info</p>
-                    <p className="text-lg font-medium tracking-tight">
-                      Episode {ep} belum tersedia untuk diputar
-                    </p>
-                    <p className="max-w-md text-sm leading-relaxed text-muted">
-                      {title ? `${title} — ` : ''}episode 1–{availableCount} sudah bisa ditonton.
-                      Episode lainnya belum tersedia di sumber.
-                    </p>
-                    <div className="flex flex-wrap items-center justify-center gap-2">
-                      <button type="button" onClick={() => goTo(availableCount)} className="btn btn-main btn-sm focus-ring">
-                        Lompat ke Episode {availableCount}
-                      </button>
-                      <button type="button" onClick={() => goTo(1)} className="btn btn-ghost btn-sm focus-ring">
-                        Mulai dari Episode 1
-                      </button>
-                    </div>
+            <div key={ep} data-ep={ep} className="relative h-full w-full snap-start snap-always">
+              {ep > availableCount ? (
+                /* episode belum tersedia — panel info full-screen */
+                <div className="flex h-full w-full flex-col items-center justify-center gap-5 bg-[rgb(var(--bg))] px-6 text-center">
+                  <p className="eyebrow">Info</p>
+                  <h2 className="text-2xl font-medium tracking-tightest">Episode {ep} belum tersedia</h2>
+                  <p className="max-w-md text-sm leading-relaxed text-muted">
+                    {title ? `${title} — ` : ''}episode 1–{availableCount} sudah bisa ditonton. Episode
+                    lainnya belum tersedia di sumber.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button type="button" onClick={() => goTo(availableCount)} className="btn btn-main btn-sm focus-ring">
+                      Lompat ke Episode {availableCount}
+                    </button>
+                    <button type="button" onClick={() => goTo(1)} className="btn btn-ghost btn-sm focus-ring">
+                      Mulai dari Episode 1
+                    </button>
                   </div>
-                ) : mounted ? (
+                </div>
+              ) : mounted ? (
+                <div className="absolute inset-0 [&>div]:aspect-auto [&>div]:h-full [&>div]:w-full [&>div]:rounded-none [&>div]:border-0">
                   <Player
                     seriesSlug={seriesSlug}
                     episode={ep}
@@ -184,43 +213,37 @@ export default function EpisodeFeed({ seriesSlug, title, cover, episodeCount, av
                     cover={cover}
                     isActive={ep === active}
                   />
-                ) : (
-                  <div className="panel flex aspect-video w-full items-center justify-center">
-                    <p className="mono text-soft">Memuat episode {ep}…</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex w-full max-w-4xl items-center justify-between gap-3">
-                <p className="mono text-soft">
-                  Status <b className="mono-accent font-normal">{ep > availableCount ? 'Belum tersedia' : ep === active ? 'Diputar' : 'Siaga'}</b>
-                </p>
-                <div className="flex items-center gap-2">
-                  {ep > 1 && (
-                    <button type="button" onClick={() => goTo(ep - 1)} className="btn btn-ghost btn-sm focus-ring">
-                      <IconChevronLeft className="h-3.5 w-3.5" /> Sebelumnya
-                    </button>
-                  )}
-                  {ep < episodeCount && (
-                    <button type="button" onClick={() => goTo(ep + 1)} className="btn btn-main btn-sm focus-ring">
-                      Berikutnya <IconChevronLeft className="h-3.5 w-3.5 rotate-180" />
-                    </button>
-                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-[rgb(var(--bg))]">
+                  <p className="mono text-soft">Memuat episode {ep}…</p>
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* petunjuk + lompat episode */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="mono text-soft">
-          Tip — klik video untuk putar/jeda · geser untuk pindah episode seperti TikTok
-        </p>
-        <Link href={`/series/${seriesSlug}`} className="go focus-ring rounded">
-          <IconPlay className="h-3.5 w-3.5" /> Detail seri
-        </Link>
+      {/* kendali geser melayang */}
+      <div className="pointer-events-none absolute inset-y-0 right-2.5 z-30 flex flex-col items-center justify-center gap-2.5 md:right-3.5">
+        <button
+          type="button"
+          aria-label="Episode sebelumnya"
+          onClick={() => goTo(active - 1)}
+          disabled={active <= 1}
+          className="focus-ring pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white/90 backdrop-blur-md transition hover:bg-black/70 disabled:opacity-30"
+        >
+          <IconChevronLeft className="h-4 w-4 rotate-90" />
+        </button>
+        <button
+          type="button"
+          aria-label="Episode berikutnya"
+          onClick={() => goTo(active + 1)}
+          disabled={active >= episodeCount}
+          className="focus-ring pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white/90 backdrop-blur-md transition hover:bg-black/70 disabled:opacity-30"
+        >
+          <IconChevronLeft className="h-4 w-4 -rotate-90" />
+        </button>
       </div>
     </section>
   );

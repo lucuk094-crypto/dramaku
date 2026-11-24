@@ -20,9 +20,11 @@ interface Props {
   episode: number;
   episodeCount: number;
   note?: string;
+  /** Isi penuh induk (mode potret full-screen). */
+  fill?: boolean;
 }
 
-export default function DbPlayer({ kind, url, videoId, title, cover, slug, episode, episodeCount, note }: Props) {
+export default function DbPlayer({ kind, url, videoId, title, cover, slug, episode, episodeCount, note, fill = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [resumeAt, setResumeAt] = useState<number | null>(null);
   const lastSave = useRef(0);
@@ -85,15 +87,15 @@ export default function DbPlayer({ kind, url, videoId, title, cover, slug, episo
   }, [slug, episode, kind, title, cover, episodeCount, resumeAt]);
 
   return (
-    <div className="panel overflow-hidden">
-      {note && (
+    <div className={fill ? 'h-full w-full bg-black' : 'panel overflow-hidden'}>
+      {!fill && note && (
         <div className="flex items-center gap-2 border-b border-[--border] bg-[--soft]/5 px-4 py-2">
           <span className="inline-block h-1.5 w-1.5 rounded-full bg-[--accent]" />
           <p className="font-mono text-[11px] uppercase tracking-mono text-[--muted]">{note}</p>
         </div>
       )}
 
-      <div className="relative aspect-video w-full bg-black">
+      <div className={fill ? 'relative h-full w-full bg-black' : 'relative aspect-video w-full bg-black'}>
         {kind === 'youtube' && videoId ? (
           <iframe
             className="absolute inset-0 h-full w-full"
@@ -106,7 +108,7 @@ export default function DbPlayer({ kind, url, videoId, title, cover, slug, episo
           <video
             ref={videoRef}
             key={`${slug}-${episode}`}
-            className="absolute inset-0 h-full w-full"
+            className="absolute inset-0 h-full w-full object-contain"
             src={url}
             poster={cover}
             controls
