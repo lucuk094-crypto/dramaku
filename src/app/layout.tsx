@@ -12,6 +12,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://dramaku-ubcc.vercel.app'),
   title: {
     default: 'DramaKu — Nonton Drama Pendek Online',
     template: '%s · DramaKu',
@@ -25,6 +26,22 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'id_ID',
     siteName: 'DramaKu',
+    url: 'https://dramaku-ubcc.vercel.app/',
+    images: [
+      {
+        url: '/og-dramaku.jpg',
+        width: 1200,
+        height: 630,
+        type: 'image/jpeg',
+        alt: 'DramaKu — Nonton drama pendek favoritmu kapan saja',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'DramaKu — Nonton Drama Pendek Online',
+    description: 'Streaming drama pendek favoritmu: tonton, simpan, dan lanjutkan kapan saja.',
+    images: ['/og-dramaku.jpg'],
   },
 };
 
