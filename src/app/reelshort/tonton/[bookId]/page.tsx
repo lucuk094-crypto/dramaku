@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getRsBook, rsBookUrl } from '@/lib/reelshort';
+import { ogMeta } from '@/lib/og';
 import { bridgeToMelolo } from '@/lib/flickreels';
 import Reveal from '@/components/Reveal';
 import RsEpisodeFeed from '@/components/RsEpisodeFeed';
@@ -18,7 +19,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const d = await getRsBook(params.bookId).catch(() => null);
   return {
     title: d ? `Nonton ${d.title} — Episode Lengkap | DramaKu` : 'Nonton Episode Lengkap | DramaKu',
-    description: d?.desc?.slice(0, 150) || 'Nonton episode lengkap langsung di DramaKu.',
+    ...ogMeta({
+      title: d ? `${d.title} — Nonton di DramaKu` : 'Nonton Episode Lengkap — DramaKu',
+      description: d?.desc,
+      path: `/reelshort/tonton/${params.bookId}`,
+      image: d?.cover || null,
+    }),
   };
 }
 

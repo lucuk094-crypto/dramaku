@@ -6,6 +6,7 @@ import BackButton from '@/components/BackButton';
 import DbPlayer from '@/components/DbPlayer';
 import { IconChevronLeft, IconPlay } from '@/components/Icons';
 import { resolveDbEpisode, resolveDbSources, dbDetail } from '@/lib/dramabox';
+import { ogMeta } from '@/lib/og';
 
 export const revalidate = 1800;
 
@@ -19,6 +20,14 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const d = await dbDetail(params.bookId).catch(() => null);
   return {
     title: d ? `${d.book.title} — Episode ${ep} | DramaKu` : 'Tonton | DramaKu',
+    ...(d
+      ? ogMeta({
+          title: `${d.book.title} — Episode ${ep} di DramaKu`,
+          description: d.book.introduction,
+          path: `/dramabox/tonton/${params.bookId}?ep=${ep}`,
+          image: d.book.cover || null,
+        })
+      : {}),
   };
 }
 

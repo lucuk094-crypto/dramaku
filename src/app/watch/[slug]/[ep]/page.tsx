@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getSeries } from '@/lib/melolo';
+import { ogMeta } from '@/lib/og';
 import EpisodeFeed from '@/components/EpisodeFeed';
 import EpisodeGrid from '@/components/EpisodeGrid';
 import MediaRow from '@/components/MediaRow';
@@ -13,7 +14,15 @@ export const revalidate = 600;
 export async function generateMetadata({ params }: { params: { slug: string; ep: string } }): Promise<Metadata> {
   try {
     const s = await getSeries(params.slug);
-    return { title: `Nonton ${s.title} — Episode ${params.ep}` };
+    return {
+      title: `Nonton ${s.title} — Episode ${params.ep}`,
+      ...ogMeta({
+        title: `Nonton ${s.title} — Episode ${params.ep} di DramaKu`,
+        description: s.short_description || s.description,
+        path: `/watch/${params.slug}/${params.ep}`,
+        image: s.cover,
+      }),
+    };
   } catch {
     return { title: 'Nonton' };
   }

@@ -5,6 +5,7 @@ import Reveal from '@/components/Reveal';
 import FavoriteButton from '@/components/FavoriteButton';
 import { IconPlay } from '@/components/Icons';
 import { resolveDbSources } from '@/lib/dramabox';
+import { ogMeta } from '@/lib/og';
 
 export const revalidate = 3600;
 
@@ -16,7 +17,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const r = await resolveDbSources(params.bookId).catch(() => null);
   return {
     title: r ? `${r.detail.book.title} | DramaKu` : 'Detail Judul | DramaKu',
-    description: r?.detail.book.introduction?.slice(0, 150) || 'Detail judul, sinopsis, dan daftar episode lengkap.',
+    ...ogMeta({
+      title: r ? `${r.detail.book.title} — Nonton di DramaKu` : 'Detail Judul — DramaKu',
+      description: r?.detail.book.introduction,
+      path: `/dramabox/judul/${params.bookId}`,
+      image: r?.detail.book.cover || null,
+    }),
   };
 }
 

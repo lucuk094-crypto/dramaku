@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { dkSeriesBySlug, dkFindMeta, dkStripHtml, slugify } from '@/lib/drakorku';
+import { ogMeta } from '@/lib/og';
 import Reveal from '@/components/Reveal';
 import { IconPlay } from '@/components/Icons';
 import { scrubSource } from '@/lib/melolo';
@@ -16,7 +17,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = s?.name || params.slug.replace(/-/g, ' ');
   return {
     title: `${name} — Drakor & Drama Asia | DramaKu`,
-    description: s?.synopsis?.slice(0, 150) || `Nonton ${name} subtitle Indonesia di DramaKu.`,
+    ...ogMeta({
+      title: `${name} — Nonton di DramaKu`,
+      description: s?.synopsis,
+      path: `/drakorku/serial/${params.slug}`,
+      image: s?.cover || null,
+    }),
   };
 }
 

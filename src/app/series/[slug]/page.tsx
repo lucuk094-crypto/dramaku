@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getSeries, scrubSource } from '@/lib/melolo';
+import { ogMeta } from '@/lib/og';
 import { fmtDate, fmtNumber } from '@/lib/format';
 import FavoriteButton from '@/components/FavoriteButton';
 import ResumeButton from '@/components/ResumeButton';
@@ -17,8 +18,12 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     const s = await getSeries(params.slug);
     return {
       title: s.title || params.slug,
-      description: s.short_description || s.description || `Nonton ${s.title} di DramaKu.`,
-      openGraph: { title: s.title || params.slug, images: s.cover ? [s.cover] : [] },
+      ...ogMeta({
+        title: `${s.title || params.slug} — Nonton di DramaKu`,
+        description: s.short_description || s.description,
+        path: `/series/${params.slug}`,
+        image: s.cover,
+      }),
     };
   } catch {
     return { title: 'Drama' };
