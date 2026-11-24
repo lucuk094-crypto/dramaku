@@ -23,6 +23,8 @@ interface Props {
  */
 export default function FrCard({ item, meloloSlug = null, index = 0, fluid = false }: Props) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
+  const [imgDead, setImgDead] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [mounted, setMounted] = useState(false);
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -106,9 +108,18 @@ export default function FrCard({ item, meloloSlug = null, index = 0, fluid = fal
 
               <div className="mt-2 flex flex-col gap-6 md:flex-row md:gap-10">
                 <div className="panel mx-auto w-full max-w-[240px] shrink-0 overflow-hidden md:mx-0">
-                  {item.cover ? (
+                  {item.cover && !imgDead ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.cover} alt={item.title} className="aspect-[3/4] w-full object-cover" />
+                    <img
+                      src={fallbackSrc || item.cover}
+                      alt={item.title}
+                      referrerPolicy="no-referrer"
+                      onError={() => {
+                        if (!fallbackSrc) setFallbackSrc(`/api/fr-cover?u=${encodeURIComponent(item.cover)}`);
+                        else setImgDead(true);
+                      }}
+                      className="aspect-[3/4] w-full object-cover"
+                    />
                   ) : (
                     <div className="flex aspect-[3/4] w-full items-center justify-center bg-accent-bg text-4xl font-black text-accent/50">
                       {(item.title || '?')[0]}
@@ -180,12 +191,17 @@ export default function FrCard({ item, meloloSlug = null, index = 0, fluid = fal
         className={`focus-ring group block rounded text-left ${fluid ? 'w-full min-w-0' : 'w-[150px] shrink-0 sm:w-[170px]'}`}
       >
         <div className="media-poster">
-          {item.cover ? (
+          {item.cover && !imgDead ? (
             <img
-              src={item.cover}
+              src={fallbackSrc || item.cover}
               alt={item.title}
               loading="lazy"
+              referrerPolicy="no-referrer"
               onLoad={() => setImgLoaded(true)}
+              onError={() => {
+                if (!fallbackSrc) setFallbackSrc(`/api/fr-cover?u=${encodeURIComponent(item.cover)}`);
+                else setImgDead(true);
+              }}
               className={`img-fade ${imgLoaded ? 'img-loaded' : ''}`}
             />
           ) : (

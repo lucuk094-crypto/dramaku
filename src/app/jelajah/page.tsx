@@ -193,8 +193,18 @@ export default async function JelajahPage() {
           </div>
         </div>
         <div className="mt-4">
-          <DbSection title="Pilihan Minggu Ini — Semua Episode Gratis Terbuka" eyebrow="Tonton Langsung" />
+          <DbSection hideHead />
         </div>
+      </Reveal>
+
+      {/* PILIHAN MINGGU INI — kurasi terbuka */}
+      <Reveal className="mt-12">
+        <DbSection
+          title="Pilihan Minggu Ini — Semua Episode Gratis Terbuka"
+          eyebrow="Tonton Langsung"
+          genreId={161}
+          className="mt-0"
+        />
       </Reveal>
 
       {/* TERBARU DI KATEGORI */}
