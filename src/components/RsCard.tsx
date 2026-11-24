@@ -41,23 +41,25 @@ export default function RsCard({ item, meloloSlug = null, index = 0, fluid = fal
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
     };
-    if (expanded) {
-      const scrollY = window.scrollY;
-      document.body.style.position = 'fixed';
-      document.body.style.top = `-${scrollY}px`;
-      document.body.style.width = '100%';
-      document.body.style.overflow = 'hidden';
-      document.body.dataset.scrollY = String(scrollY);
-    } else {
-      const scrollY = Number.parseInt(document.body.dataset.scrollY || '0', 10);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  /* kunci scroll body HANYA saat panel terbuka — bersihkan tepat saat ditutup */
+  useEffect(() => {
+    if (!expanded) return;
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+    return () => {
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.width = '';
       document.body.style.overflow = '';
-      if (scrollY) window.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior });
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+      window.scrollTo({ top: scrollY, behavior: 'instant' as ScrollBehavior });
+    };
   }, [expanded]);
 
   useEffect(() => {

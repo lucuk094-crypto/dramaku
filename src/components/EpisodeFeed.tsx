@@ -29,14 +29,18 @@ export default function EpisodeFeed({ seriesSlug, title, cover, episodeCount, av
   const [active, setActive] = useState(startEp);
   const [visited, setVisited] = useState<Set<number>>(() => new Set([startEp]));
 
-  /* kunci scroll latar saat layar-penuh (mobile) */
+  /* kunci scroll latar saat layar-penuh (mobile) — pakai kelas !important
+     supaya tidak tertimpa komponen lain yang menyetel body.style */
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');
     if (!mq.matches) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const style = document.createElement('style');
+    style.textContent = 'body.dk-feed-locked{overflow:hidden !important;}';
+    document.head.appendChild(style);
+    document.body.classList.add('dk-feed-locked');
     return () => {
-      document.body.style.overflow = prev;
+      document.body.classList.remove('dk-feed-locked');
+      style.remove();
     };
   }, []);
 
@@ -58,23 +62,29 @@ export default function EpisodeFeed({ seriesSlug, title, cover, episodeCount, av
     }
   }, [startEp]);
 
-  /* gulir langsung ke episode awal (retry beberapa frame — layout bisa
-     terlambat stabil, dan snap-mandatory perlu posisi yang mantap) */
+  /* gulir langsung ke episode awal — ulangi sampai benar-benar mendarat
+     (CSS/layout bisa telat stabil, snap-mandatory menuntut posisi mantap) */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     let tries = 0;
+    let ok = 0;
     let raf = 0;
     const jump = () => {
       const target = el.querySelector(`[data-ep="${startEp}"]`) as HTMLElement | null;
-      if (target) {
+      if (target && target.offsetHeight > 0) {
         const prev = el.style.scrollBehavior;
         el.style.scrollBehavior = 'auto';
         const top = target.offsetTop;
-        if (Math.abs(el.scrollTop - top) > 2) el.scrollTop = top;
+        if (Math.abs(el.scrollTop - top) > 2) {
+          el.scrollTop = top;
+          ok = 0;
+        } else {
+          ok += 1;
+        }
         el.style.scrollBehavior = prev;
       }
-      if (++tries < 15) raf = requestAnimationFrame(jump);
+      if (ok < 3 && ++tries < 180) raf = requestAnimationFrame(jump);
     };
     raf = requestAnimationFrame(jump);
     return () => cancelAnimationFrame(raf);
