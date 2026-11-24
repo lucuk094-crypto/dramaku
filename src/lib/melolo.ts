@@ -1059,6 +1059,7 @@ export async function getNewSeries(limit = 24, lang = DEFAULT_LANG): Promise<New
   const res = await fetch(`${BASE}/sitemap/movie.xml`, {
     headers: { 'User-Agent': UA },
     next: { revalidate: 1800 },
+    signal: AbortSignal.timeout(12000),
   });
   if (!res.ok) throw new Error(`sitemap HTTP ${res.status}`);
   const xml = await res.text();
@@ -1079,19 +1080,19 @@ export async function getNewSeries(limit = 24, lang = DEFAULT_LANG): Promise<New
   const queue = [...top];
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
   const fetchLight = async (slug: string): Promise<any | null> => {
-    for (const L of Array.from(new Set([lang, 'en', 'pt', 'jp', 'es', 'fr', 'de', 'th']))) {
-      try {
-        const r = await fetch(
+    const langs = Array.from(new Set([lang, 'en', 'pt', 'jp', 'es']));
+    const tries = await Promise.allSettled(
+      langs.map((L) =>
+        fetch(
           `${BASE}/api/series/getSeriesBySlug?language=${L}&series_slug=${slug}&pageType=detail&episode_id=1`,
-          { headers: { 'User-Agent': UA }, next: { revalidate: 1800 } },
-        );
-        const json = await r.json();
-        const d: any = Array.isArray(json?.data) ? json.data[0] : json?.data;
-        if (d?.series_slug) return d;
-      } catch {
-        /* coba bahasa berikutnya */
-      }
-      await sleep(150);
+          { headers: { 'User-Agent': UA }, next: { revalidate: 1800 }, signal: AbortSignal.timeout(8000) },
+        ).then((r) => r.json()),
+      ),
+    );
+    for (const t of tries) {
+      if (t.status !== 'fulfilled') continue;
+      const d: any = Array.isArray((t.value as any)?.data) ? (t.value as any).data[0] : (t.value as any)?.data;
+      if (d?.series_slug) return d;
     }
     return null;
   };

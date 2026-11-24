@@ -10,8 +10,11 @@ import Reveal from '@/components/Reveal';
 export const dynamic = 'force-dynamic'; // render saat runtime — build bebas tarik data hulu
 
 export default async function HomePage() {
-  const home = await getHome().catch(() => ({ genres: [] as any[], sections: [] as any[] }));
-  const news = await getNewSeries(20).catch(() => []);
+  // anggaran waktu global — saat hulu lambat, tampilkan apa adanya, jangan menggantung
+  const budget = <T,>(p: Promise<T>, ms: number, fb: T): Promise<T> =>
+    Promise.race([p.catch(() => fb), new Promise<T>((r) => setTimeout(() => r(fb), ms))]);
+  const home = await budget(getHome(), 15000, { genres: [] as any[], sections: [] as any[] });
+  const news = await budget(getNewSeries(20), 20000, [] as any[]);
 
   // Hero: prioritaskan judul bersinopsis (tampilan lebih kaya), unik per slug
   const seen = new Set<string>();
@@ -27,7 +30,7 @@ export default async function HomePage() {
   }
 
   // lengkapi metadata hero agar banner tampil kaya (sinopsis, jumlah episode)
-  const heroItems = await enrichCards(heroPool);
+  const heroItems = await budget(enrichCards(heroPool), 15000, heroPool);
 
   // ---- ANTI-DOBEL: satu judul tampil SATU KALI di seluruh katalog beranda ----
   const globalSeen = new Set<string>(heroItems.map((h) => h.slug));
@@ -45,7 +48,11 @@ export default async function HomePage() {
   }
   const sections: { title: string; items: MediaCard[] }[] = [];
   for (const s of baseSections) {
-    const items = await fillRail(s.items, globalSeen, 22);
+    // anggaran waktu per seksi — halaman tidak boleh menggantung saat hulu lambat
+    const items = await Promise.race([
+      fillRail(s.items, globalSeen, 22),
+      new Promise<MediaCard[]>((r) => setTimeout(() => r(s.items), 15000)),
+    ]);
     if (items.length >= 3) sections.push({ title: s.title, items });
   }
 
