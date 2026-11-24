@@ -84,6 +84,7 @@ async function frCallInner<T>(path: string, payload: Record<string, string | num
     body: JSON.stringify(payload),
     next: { revalidate: 1800 },
     cache: 'force-cache',
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`FR ${path} HTTP ${res.status}`);
   const json = (await res.json()) as { status_code: number; msg?: string; data?: T };
@@ -243,7 +244,7 @@ async function bridgeToMeloloInner(
       try {
         const res = await fetch(
           `${MELOLO_BASE}/api/series/getSeriesBySlug?language=${L}&series_slug=${direct}&pageType=detail&episode_id=1`,
-          { headers: { 'User-Agent': UA }, next: { revalidate: 3600 } },
+          { headers: { 'User-Agent': UA }, next: { revalidate: 3600 }, signal: AbortSignal.timeout(8000) },
         );
         const json = await res.json();
         const d = Array.isArray(json?.data) ? json.data[0] : json?.data;
@@ -263,6 +264,7 @@ async function bridgeToMeloloInner(
     const res = await fetch(`${MELOLO_BASE}/api/series/searchSeries?language=id&query=${q}&pn=1&ps=8`, {
       headers: { 'User-Agent': UA },
       next: { revalidate: 3600 },
+      signal: AbortSignal.timeout(8000),
     });
     const json = await res.json();
     const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');

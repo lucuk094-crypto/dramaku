@@ -116,6 +116,7 @@ async function dbFetchInner<T>(path: string, revalidate = 3600): Promise<T> {
       const res = await fetch(`${API}${path}`, {
         headers: { 'x-apikey': API_KEY, 'User-Agent': 'Mozilla/5.0' },
         next: { revalidate },
+        signal: AbortSignal.timeout(12000),
       });
       if (!res.ok) {
         const err: any = new Error(`dramabox ${res.status}`);
@@ -196,7 +197,7 @@ async function ytInnertubeSearch(query: string): Promise<YtVideo[]> {
     const keyPage = await fetch('https://www.youtube.com/results?search_query=dramabox', {
       headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
       next: { revalidate: 86400 },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(9000),
     });
     const html = await keyPage.text();
     const key = html.match(/"INNERTUBE_API_KEY":"([^"]+)"/)?.[1];
@@ -208,7 +209,7 @@ async function ytInnertubeSearch(query: string): Promise<YtVideo[]> {
       headers: { 'Content-Type': 'application/json', 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.9' },
       body: JSON.stringify({ context: { client: { clientName: 'WEB', clientVersion: ver } }, query }),
       next: { revalidate: 21600 },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(9000),
     });
     const raw = await res.text();
 

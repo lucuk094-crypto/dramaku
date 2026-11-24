@@ -138,6 +138,7 @@ async function dkFetch<T>(path: string, revalidate = 900): Promise<T> {
   const res = await fetch(`${API}${path}`, {
     headers: { 'x-apikey': API_KEY },
     next: { revalidate },
+    signal: AbortSignal.timeout(10000),
   });
   if (!res.ok) throw new Error(`drakorku ${res.status}`);
   return res.json() as Promise<T>;

@@ -114,7 +114,7 @@ export interface SignedStream {
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function request(url: string, options: { json?: boolean; timeout?: number; retries?: number } = {}) {
-  const { json = false, timeout = 25000, retries = 1 } = options;
+  const { json = false, timeout = 12000, retries = 1 } = options;
   try {
     const res = await fetch(url, {
       headers: {
@@ -669,16 +669,16 @@ async function getSeriesInner(slug: string, episode: number | null = null, lang 
   // Rantai bahasa: judul terbaru sering belum dilokalkan ke `lang` —
   // coba bahasa lain sampai detail ketemu (prinsip union lintas bahasa).
   let detail: any = null;
-  for (const L of Array.from(new Set([lang, 'en', 'pt', 'jp']))) {
-    try {
-      const payload = await request(apiUrl(L, slug, episode ?? 1), { json: true });
-      const d = payload?.data?.[0];
-      if (d && (d.series_slug || d.name)) {
-        detail = d;
-        break;
-      }
-    } catch {
-      /* coba bahasa berikutnya */
+  const langs = Array.from(new Set([lang, 'en', 'pt', 'jp']));
+  const tries = await Promise.allSettled(
+    langs.map((L) => request(apiUrl(L, slug, episode ?? 1), { json: true })),
+  );
+  for (const t of tries) {
+    if (t.status !== 'fulfilled') continue;
+    const d = (t.value as any)?.data?.[0];
+    if (d && (d.series_slug || d.name)) {
+      detail = d;
+      break;
     }
   }
   if (!detail || (!detail.series_slug && !detail.name)) {
