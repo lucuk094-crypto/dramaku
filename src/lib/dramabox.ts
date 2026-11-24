@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 /**
  * DramaBox — katalog drama pendek global (API theresav.eu / Blckrosé).
  *
@@ -108,7 +109,7 @@ export interface DbEpisodePlan {
 
 /* ───────────────────────── util ───────────────────────── */
 
-async function dbFetch<T>(path: string, revalidate = 3600): Promise<T> {
+async function dbFetchInner<T>(path: string, revalidate = 3600): Promise<T> {
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -132,6 +133,12 @@ async function dbFetch<T>(path: string, revalidate = 3600): Promise<T> {
   throw lastErr instanceof Error ? lastErr : new Error('dramabox gagal');
 }
 
+
+const dbFetchCached = unstable_cache(dbFetchInner as any, ['db:fetch'], { revalidate: 1800 });
+
+async function dbFetch<T>(path: string, revalidate = 3600): Promise<T> {
+  return (await dbFetchCached(path, revalidate)) as T;
+}
 /* ───────────────────────── katalog ───────────────────────── */
 
 export function dbCategories(): Promise<{ total: number; genres: DbGenre[] }> {
@@ -236,7 +243,7 @@ function episodeNumberFrom(text: string): number | null {
  * Petakan nomor episode → id video YouTube dari kanal resmi DramaBox.
  * Best-effort: satu pencarian per judul, hasil di-cache 6 jam.
  */
-export async function ytEpisodeMap(title: string): Promise<Record<number, string>> {
+async function ytEpisodeMapInner(title: string): Promise<Record<number, string>> {
   const map: Record<number, string> = {};
   const vids = await ytInnertubeSearch(`${title} episode DramaBox`);
   const reOfficial = /drama\s*box/i;
@@ -248,6 +255,12 @@ export async function ytEpisodeMap(title: string): Promise<Record<number, string
   return map;
 }
 
+
+const ytMapCached = unstable_cache(ytEpisodeMapInner, ['db:ytMap'], { revalidate: 21600 });
+
+export async function ytEpisodeMap(title: string): Promise<Record<number, string>> {
+  return (await ytMapCached(title)) as Record<number, string>;
+}
 /* ─────────────────── resolusi "all unlock" ─────────────────── */
 
 export interface DbResolution {
@@ -266,31 +279,32 @@ export interface DbResolution {
  * Hitung sumber pemutar terbaik untuk SETIAP episode (dipakai grid & halaman tonton).
  * Panggilan berat di-cache; aman dipanggil berulang.
  */
-export async function resolveDbSources(bookId: string): Promise<DbResolution> {
+async function resolveDbSourcesInner(bookId: string): Promise<DbResolution> {
   const detail = await dbDetail(bookId);
   const total = detail.totalEpisodes || detail.episodes.length;
 
-  // 1) jembatan judul → katalog tonton (melolo)
-  let meloloSlug: string | null = null;
-  let meloloTotal = 0;
-  try {
-    const { bridgeToMelolo } = await import('@/lib/flickreels');
-    const hit = await bridgeToMelolo(detail.book.title);
-    if (hit?.slug) {
-      meloloSlug = hit.slug;
-      meloloTotal = await meloloAvailable(hit.slug);
-    }
-  } catch {
-    /* tanpa jembatan */
-  }
-
-  // 2) unggahan resmi YouTube (hanya bila jembatan tidak menutup semua)
-  let yt: Record<number, string> = {};
   const lockedN = detail.episodes.filter((e) => !e.free).map((e) => e.index);
-  const coveredByMelolo = lockedN.filter((n) => meloloSlug && n <= meloloTotal).length;
-  if (lockedN.length && coveredByMelolo < lockedN.length) {
-    yt = await ytEpisodeMap(detail.book.title);
-  }
+
+  // 1+2) jembatan melolo & unggahan resmi YouTube — dijalankan PARALEL
+  const [meloloLeg, yt] = await Promise.all([
+    (async () => {
+      try {
+        const { bridgeToMelolo } = await import('@/lib/flickreels');
+        const hit = await bridgeToMelolo(detail.book.title);
+        if (hit?.slug) {
+          return { slug: hit.slug as string | null, total: await meloloAvailable(hit.slug) };
+        }
+      } catch {
+        /* tanpa jembatan */
+      }
+      return { slug: null as string | null, total: 0 };
+    })(),
+    lockedN.length
+      ? ytEpisodeMap(detail.book.title).catch(() => ({}) as Record<number, string>)
+      : Promise.resolve({} as Record<number, string>),
+  ]);
+  const meloloSlug = meloloLeg.slug;
+  const meloloTotal = meloloLeg.total;
 
   // 3) susun rencana per episode
   const plans: DbEpisodePlan[] = detail.episodes.map((e) => {
@@ -314,10 +328,23 @@ export async function resolveDbSources(bookId: string): Promise<DbResolution> {
  *  - 'youtube' → id video
  *  - 'preview' → mp4 cuplikan 15 detik
  */
-export async function resolveDbEpisode(
+async function resolveDbEpisodeInner(
   bookId: string,
   n: number,
 ): Promise<{ kind: DbSourceKind; url?: string; videoId?: string; note: string; total: number; title: string; cover: string }> {
+  // Jalan pintas: episode gratis resmi cukup dari detail (tanpa kaki jembatan).
+  const dOnly = await dbDetail(bookId);
+  const epInfo = dOnly.episodes.find((e) => e.index === n);
+  const baseFast = {
+    total: dOnly.totalEpisodes || dOnly.episodes.length,
+    title: dOnly.book.title,
+    cover: dOnly.book.cover,
+  };
+  if (epInfo?.free) {
+    const s = await dbStream(bookId, n);
+    return { kind: 'db', url: s.mp4 || s.url, note: 'Streaming penuh.', ...baseFast };
+  }
+
   const r = await resolveDbSources(bookId);
   const plan = r.plans.find((p) => p.n === n) || { n, free: false, kind: 'preview' as const };
   const book = r.detail.book;
@@ -351,6 +378,18 @@ export async function resolveDbEpisode(
   };
 }
 
+
+const sourcesCached = unstable_cache(resolveDbSourcesInner, ['db:sources'], { revalidate: 1800 });
+
+export async function resolveDbSources(bookId: string) {
+  return (await sourcesCached(bookId)) as Awaited<ReturnType<typeof resolveDbSourcesInner>>;
+}
+
+const episodeCached = unstable_cache(resolveDbEpisodeInner, ['db:episode'], { revalidate: 300 });
+
+export async function resolveDbEpisode(bookId: string, n: number) {
+  return (await episodeCached(bookId, n)) as Awaited<ReturnType<typeof resolveDbEpisodeInner>>;
+}
 /* ───────────────────────── kartu ringkas ───────────────────────── */
 
 export function dbCardFromBook(b: DbBook) {

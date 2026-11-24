@@ -7,6 +7,7 @@
  *  - JSON API                : getSeriesBySlug, searchNovelsByQuery, getNovelsBySlug
  *  - Stream                  : URL signed CDN (Referer wajib https://melolo.com/, TTL ~300 dtk)
  */
+import { unstable_cache } from 'next/cache';
 import * as cheerio from 'cheerio';
 
 export const BASE = 'https://melolo.com';
@@ -664,7 +665,7 @@ export async function fillMissingCovers(items: MediaCard[], lang = DEFAULT_LANG)
   });
 }
 
-export async function getSeries(slug: string, episode: number | null = null, lang = DEFAULT_LANG): Promise<SeriesDetail> {
+async function getSeriesInner(slug: string, episode: number | null = null, lang = DEFAULT_LANG): Promise<SeriesDetail> {
   // Rantai bahasa: judul terbaru sering belum dilokalkan ke `lang` —
   // coba bahasa lain sampai detail ketemu (prinsip union lintas bahasa).
   let detail: any = null;
@@ -857,6 +858,13 @@ export async function getSeries(slug: string, episode: number | null = null, lan
   };
 }
 
+
+const getSeriesCached = unstable_cache(getSeriesInner, ['melolo:getSeries'], { revalidate: 600 });
+
+/** Versi ter-cache (10 menit) — aman untuk render berulang. */
+export async function getSeries(slug: string, episode: number | null = null, lang = DEFAULT_LANG): Promise<SeriesDetail> {
+  return (await getSeriesCached(slug, episode, lang)) as SeriesDetail;
+}
 export interface NovelDetail {
   novels_slug: string;
   title: string | null;

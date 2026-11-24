@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import BackButton from '@/components/BackButton';
 import DbPlayer from '@/components/DbPlayer';
-import { resolveDbEpisode, resolveDbSources } from '@/lib/dramabox';
+import { resolveDbEpisode, resolveDbSources, dbDetail } from '@/lib/dramabox';
 
 export const revalidate = 1800;
 
@@ -14,21 +15,22 @@ interface Props {
 
 export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const ep = Math.max(1, Number(searchParams.ep || 1) || 1);
-  const r = await resolveDbSources(params.bookId).catch(() => null);
+  const d = await dbDetail(params.bookId).catch(() => null);
   return {
-    title: r ? `${r.detail.book.title} — Episode ${ep} | DramaKu` : 'Tonton | DramaKu',
+    title: d ? `${d.book.title} — Episode ${ep} | DramaKu` : 'Tonton | DramaKu',
   };
 }
 
 export default async function DramaboxWatchPage({ params, searchParams }: Props) {
   const ep = Math.max(1, Number(searchParams.ep || 1) || 1);
-  const [plan, res] = await Promise.all([
+  const [plan, d] = await Promise.all([
     resolveDbEpisode(params.bookId, ep).catch(() => null),
-    resolveDbSources(params.bookId).catch(() => null),
+    dbDetail(params.bookId).catch(() => null),
   ]);
-  if (!plan || !res) notFound();
+  if (!plan || !d) notFound();
 
-  const b = res.detail.book;
+  const b = d.book;
+  const total = plan.total;
   const slug = `db-${b.bookId}`;
   const noteText =
     plan.kind === 'preview'
@@ -42,7 +44,7 @@ export default async function DramaboxWatchPage({ params, searchParams }: Props)
       <div className="flex items-center justify-between gap-3">
         <BackButton />
         <p className="font-mono text-[11px] uppercase tracking-mono text-soft">
-          Episode {ep} dari {res.total}
+          Episode {ep} dari {total}
         </p>
       </div>
 
@@ -56,7 +58,7 @@ export default async function DramaboxWatchPage({ params, searchParams }: Props)
             cover={plan.cover || b.cover}
             slug={slug}
             episode={ep}
-            episodeCount={res.total}
+            episodeCount={total}
             note={noteText}
           />
 
@@ -75,7 +77,7 @@ export default async function DramaboxWatchPage({ params, searchParams }: Props)
                 ← Episode {ep - 1}
               </Link>
             )}
-            {ep < res.total && (
+            {ep < total && (
               <Link href={`/dramabox/tonton/${b.bookId}?ep=${ep + 1}`} className="btn btn-main btn-sm focus-ring">
                 Episode {ep + 1} →
               </Link>
@@ -86,44 +88,65 @@ export default async function DramaboxWatchPage({ params, searchParams }: Props)
           </div>
         </div>
 
-        {/* daftar episode */}
-        <aside>
-          <p className="eyebrow">Daftar Episode</p>
-          <div className="mt-3 grid grid-cols-5 gap-2 lg:grid-cols-6">
-            {res.plans.map((p) => {
-              const open = p.kind !== 'preview';
-              return (
-                <Link
-                  key={p.n}
-                  href={`/dramabox/tonton/${b.bookId}?ep=${p.n}`}
-                  title={open ? `Episode ${p.n}` : `Episode ${p.n} — premium (cuplikan)`}
-                  className={`focus-ring flex aspect-square flex-col items-center justify-center gap-[2px] rounded border font-mono text-[11px] tracking-mono transition hover:scale-[1.06] ${
-                    p.n === ep
-                      ? 'border-[--accent] bg-[--accent] text-[rgb(var(--btn-text))]'
-                      : open
-                        ? 'border-[--border] bg-[--panel] text-[--fg]/85 hover:border-[--accent]/60'
-                        : 'border-dashed border-[--border] bg-[--panel]/40 text-[--muted]/70'
-                  }`}
-                >
-                  {open ? (
-                    p.n
-                  ) : (
-                    <>
-                      <span>{p.n}</span>
-                      <span className="rounded-full border border-[--muted]/50 bg-[--muted]/10 px-[2px] py-[1px] text-[6px] leading-none tracking-[0.03em] text-[--muted]">
-                        PREMIUM
-                      </span>
-                    </>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-          <p className="mt-3 font-mono text-[10px] uppercase tracking-mono text-soft">
-            {res.openCount} dari {res.total} terbuka · sisanya premium di sumber resmi
-          </p>
-        </aside>
+        {/* daftar episode — mengalir supaya pemutar tidak terblokir */}
+        <Suspense
+          fallback={
+            <aside aria-hidden>
+              <p className="eyebrow">Daftar Episode</p>
+              <div className="mt-3 grid grid-cols-5 gap-2 opacity-40 lg:grid-cols-6">
+                {Array.from({ length: 12 }).map((_, i) => (
+                  <div key={i} className="aspect-square animate-pulse rounded border border-[--border] bg-[--panel]/50" />
+                ))}
+              </div>
+            </aside>
+          }
+        >
+          <DbEpisodeAside bookId={b.bookId} ep={ep} />
+        </Suspense>
       </div>
     </div>
+  );
+}
+
+async function DbEpisodeAside({ bookId, ep }: { bookId: string; ep: number }) {
+  const res = await resolveDbSources(bookId).catch(() => null);
+  if (!res) return null;
+  return (
+    <aside>
+      <p className="eyebrow">Daftar Episode</p>
+      <div className="mt-3 grid grid-cols-5 gap-2 lg:grid-cols-6">
+        {res.plans.map((p) => {
+          const open = p.kind !== 'preview';
+          return (
+            <Link
+              key={p.n}
+              href={`/dramabox/tonton/${bookId}?ep=${p.n}`}
+              title={open ? `Episode ${p.n}` : `Episode ${p.n} — premium (cuplikan)`}
+              className={`focus-ring flex aspect-square flex-col items-center justify-center gap-[2px] rounded border font-mono text-[11px] tracking-mono transition hover:scale-[1.06] ${
+                p.n === ep
+                  ? 'border-[--accent] bg-[--accent] text-[rgb(var(--btn-text))]'
+                  : open
+                    ? 'border-[--border] bg-[--panel] text-[--fg]/85 hover:border-[--accent]/60'
+                    : 'border-dashed border-[--border] bg-[--panel]/40 text-[--muted]/70'
+              }`}
+            >
+              {open ? (
+                p.n
+              ) : (
+                <>
+                  <span>{p.n}</span>
+                  <span className="rounded-full border border-[--muted]/50 bg-[--muted]/10 px-[2px] py-[1px] text-[6px] leading-none tracking-[0.03em] text-[--muted]">
+                    PREMIUM
+                  </span>
+                </>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+      <p className="mt-3 font-mono text-[10px] uppercase tracking-mono text-soft">
+        {res.openCount} dari {res.total} terbuka · sisanya premium di sumber resmi
+      </p>
+    </aside>
   );
 }

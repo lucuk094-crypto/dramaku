@@ -9,6 +9,7 @@
  * Request ditandatangani: MD5(payload k=v terurut + "&signSalt=…") sebagai header `sign`.
  * Jembatan judul → slug melolo (agar kartu bisa masuk halaman tonton DramaKu).
  */
+import { unstable_cache } from 'next/cache';
 import { createHash } from 'node:crypto';
 import { BASE as MELOLO_BASE } from './melolo';
 
@@ -66,7 +67,7 @@ function memo<T>(key: string, ttl: number, fn: () => Promise<T>): Promise<T> {
 
 /* ------------------------------------------------------------------ core */
 
-async function frCall<T>(path: string, payload: Record<string, string | number>): Promise<T> {
+async function frCallInner<T>(path: string, payload: Record<string, string | number>): Promise<T> {
   const sorted = Object.entries(payload)
     .sort(([a], [b]) => (a < b ? -1 : 1))
     .map(([k, v]) => `${k}=${v}`)
@@ -93,6 +94,12 @@ async function frCall<T>(path: string, payload: Record<string, string | number>)
 /* ------------------------------------------------------------------ kategori */
 
 /** 126 tag Kategori + Karakter (Bahasa Indonesia). Stabil — cache 24 jam. */
+
+const frCallCached = unstable_cache(frCallInner as any, ['fr:frCall'], { revalidate: 1800 });
+
+async function frCall<T>(path: string, payload: Record<string, string | number>): Promise<T> {
+  return (await frCallCached(path, payload)) as T;
+}
 export function getFrCategories(): Promise<FrCategory[]> {
   return memo('fr:cats', 24 * 3600e3, async () => {
     const data = await frCall<FrCategory[]>('/web/playlet_category/getCategoryList', {
@@ -223,7 +230,7 @@ function jaccard(a: Set<string>, b: Set<string>): number {
   return inter / Math.max(1, a.size + b.size - inter);
 }
 
-export async function bridgeToMelolo(
+async function bridgeToMeloloInner(
   title: string,
 ): Promise<{ slug: string; name: string } | null> {
   const key = title.trim().toLowerCase();
@@ -306,6 +313,14 @@ export async function bridgeToMelolo(
 }
 
 /** Jembatan massal — pool kecil + jeda (sumber membatasi ledakan paralel). */
+
+const bridgeToMeloloCached = unstable_cache(bridgeToMeloloInner, ['fr:bridgeMelolo'], { revalidate: 3600 });
+
+export async function bridgeToMelolo(
+  title: string,
+): Promise<{ slug: string; name: string } | null> {
+  return (await bridgeToMeloloCached(title)) as { slug: string; name: string } | null;
+}
 export async function bridgeMany(
   titles: string[],
 ): Promise<(Map<string, { slug: string; name: string }>)> {
