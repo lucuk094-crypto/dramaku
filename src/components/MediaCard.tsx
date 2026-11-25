@@ -169,10 +169,13 @@ export default function MediaCard({ item, index = 0, showRank = false, wide = fa
           document.body,
         )}
 
-      {/* ===== kartu (hover 3D → klik membesar) ===== */}
-      <motion.button
-        type="button"
-        onClick={open}
+      {/* ===== kartu (hover 3D → klik membesar; tautan asli agar tetap bisa dibuka tanpa JS) ===== */}
+      <motion.a
+        href={href}
+        onClick={(e) => {
+          e.preventDefault();
+          open();
+        }}
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: '40px' }}
@@ -248,7 +251,7 @@ export default function MediaCard({ item, index = 0, showRank = false, wide = fa
           {item.rating && genreLine ? ' · ' : ''}
           {genreLine}
         </motion.p>
-      </motion.button>
+      </motion.a>
     </>
   );
 }

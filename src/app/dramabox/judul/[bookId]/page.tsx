@@ -88,6 +88,7 @@ export default async function DramaboxDetailPage({ params }: Props) {
                 cover={b.cover}
                 rating={b.rating ? String(b.rating) : null}
                 episode_count={r.total}
+                type="dramabox"
                 className="btn btn-ghost focus-ring"
               />
               {r.meloloSlug && (

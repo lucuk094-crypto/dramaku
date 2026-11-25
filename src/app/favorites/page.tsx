@@ -8,6 +8,15 @@ import EmptyState from '@/components/EmptyState';
 import { PageHeader } from '@/components/MediaRow';
 import { IconHeartFilled, IconPlay, IconX } from '@/components/Icons';
 
+/** Tautan favorit sadar jenis — novel/dramabox tidak boleh diarahkan ke /series/. */
+function favHref(item: FavItem): string {
+  if (item.type === 'novels') return `/novels/${item.slug}`;
+  if (item.type === 'dramabox') return `/dramabox/judul/${item.slug.replace(/^db-/, '')}`;
+  if (item.type === 'series') return `/series/${item.slug}`;
+  if (item.slug.startsWith('db-')) return `/dramabox/judul/${item.slug.slice(3)}`;
+  return `/buka/${item.slug}`; // data lama tanpa jenis — deteksi otomatis di server
+}
+
 export default function FavoritesPage() {
   const [items, setItems] = useState<FavItem[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -57,7 +66,7 @@ export default function FavoritesPage() {
                 transition={{ duration: 0.35, delay: Math.min(i * 0.03, 0.35), ease: [0.23, 1, 0.32, 1] }}
                 className="group relative"
               >
-                <Link href={`/series/${item.slug}`} className="media-card focus-ring rounded">
+                <Link href={favHref(item)} className="media-card focus-ring rounded">
                   <div className="media-poster">
                     {item.cover ? (
                       <img src={item.cover} alt={item.title || ''} loading="lazy" />
@@ -80,7 +89,13 @@ export default function FavoritesPage() {
                   </div>
                   <h3 className="media-title">{item.title || item.slug}</h3>
                   <p className="media-meta">
-                    {item.episode_count !== null ? `${item.episode_count} Episode` : 'Drama'}
+                    {item.episode_count !== null
+                      ? item.type === 'novels'
+                        ? `${item.episode_count} bab`
+                        : `${item.episode_count} Episode`
+                      : item.type === 'novels'
+                        ? 'Novel'
+                        : 'Drama'}
                   </p>
                 </Link>
                 <button

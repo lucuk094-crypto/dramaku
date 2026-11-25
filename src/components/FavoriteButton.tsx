@@ -11,10 +11,12 @@ interface Props {
   cover: string | null;
   rating: string | null;
   episode_count: number | null;
+  /** jenis konten agar tautan favorit tidak salah arah */
+  type?: 'series' | 'novels' | 'dramabox';
   className?: string;
 }
 
-export default function FavoriteButton({ slug, title, cover, rating, episode_count, className }: Props) {
+export default function FavoriteButton({ slug, title, cover, rating, episode_count, type = 'series', className }: Props) {
   const [active, setActive] = useState(false);
   const [burst, setBurst] = useState(false);
 
@@ -23,7 +25,7 @@ export default function FavoriteButton({ slug, title, cover, rating, episode_cou
   }, [slug]);
 
   const onClick = () => {
-    const now = toggleFavorite({ slug, title, cover, rating, episode_count });
+    const now = toggleFavorite({ slug, title, cover, rating, episode_count, type });
     setActive(now);
     if (now) {
       setBurst(true);

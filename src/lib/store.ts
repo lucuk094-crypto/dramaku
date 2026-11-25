@@ -14,6 +14,8 @@ export interface FavItem {
   rating: string | null;
   episode_count: number | null;
   added_at: number;
+  /** jenis konten: 'series' | 'novels' | 'dramabox' — penentu tautan di halaman Favorit */
+  type?: 'series' | 'novels' | 'dramabox';
 }
 
 export interface HistoryItem {

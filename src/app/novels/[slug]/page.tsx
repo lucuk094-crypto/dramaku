@@ -88,6 +88,7 @@ export default async function NovelPage({ params }: { params: { slug: string } }
               cover={novel.cover}
               rating={novel.rating}
               episode_count={novel.episode_count}
+              type="novels"
             />
           </div>
 
